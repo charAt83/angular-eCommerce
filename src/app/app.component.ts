@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
+import { ReactiveFormsModule } from '@angular/forms';
 import { RouterModule, RouterOutlet } from '@angular/router';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import { CartStatusComponent } from "./components/cart-status/cart-status.component";
@@ -15,7 +16,8 @@ import { SearchComponent } from './components/search/search.component';
     SearchComponent,
     NgbModule,
     CartStatusComponent,
-    RouterModule
+    RouterModule, 
+    ReactiveFormsModule
 ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css',

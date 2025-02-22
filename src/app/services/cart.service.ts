@@ -20,8 +20,8 @@ export class CartService {
     let existingCartItem: CartItem | undefined = undefined;
 
     if (this.cartItems.length > 0) {
-      existingCartItem = this.cartItems.find(item => item.id === cartItem.id)
-      alreadyExistsInCart = (existingCartItem != undefined);
+      existingCartItem = this.cartItems.find((item) => item.id === cartItem.id);
+      alreadyExistsInCart = existingCartItem != undefined;
     }
 
     if (alreadyExistsInCart && existingCartItem) {
@@ -45,6 +45,25 @@ export class CartService {
 
     this.totalPrice.next(totalPriceValue);
     this.totalQuantity.next(totalQuantityValue);
+  }
+
+  removeItem(item: CartItem) {
+    item.quantity--;
+    if (item.quantity == 0) {
+      this.remove(item);
+    } else {
+      this.computeCartTotal();
+    }
+  }
+  remove(item: CartItem) {
+    const index = this.cartItems.findIndex(
+      (itemsInCart) => item.id === itemsInCart.id
+    );
+    if (index > -1) {
+      this.cartItems.splice(index, 1);
+
+      this.computeCartTotal();
+    }
   }
 }
 
