@@ -4,6 +4,7 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { RouterModule, RouterOutlet } from '@angular/router';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import { CartStatusComponent } from "./components/cart-status/cart-status.component";
+import { LoginStatusComponent } from "./components/login-status/login-status.component";
 import { ProductCategoryMenuComponent } from './components/product-category-menu/product-category-menu.component';
 import { SearchComponent } from './components/search/search.component';
 
@@ -16,8 +17,9 @@ import { SearchComponent } from './components/search/search.component';
     SearchComponent,
     NgbModule,
     CartStatusComponent,
-    RouterModule, 
-    ReactiveFormsModule
+    RouterModule,
+    ReactiveFormsModule,
+    LoginStatusComponent,
 ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css',

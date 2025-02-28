@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withFetch } from '@angular/common/http';
 import {
   ApplicationConfig,
   importProvidersFrom,
@@ -13,25 +13,20 @@ import {
 import { routes } from './app.routes';
 import { ProductService } from './services/product.service';
 
-import { OktaAuthModule } from '@okta/okta-angular';
-import OktaAuth from '@okta/okta-auth-js';
+import { OKTA_CONFIG, OktaAuthModule } from '@okta/okta-angular';
+import { OktaAuth } from '@okta/okta-auth-js';
+import myAppConfig from './config/my-app-config';
+const oktaConfig = myAppConfig.oidc;
+const oktaAuth = new OktaAuth(oktaConfig);
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    importProvidersFrom(
-      OktaAuthModule.forRoot({
-        oktaAuth: new OktaAuth({
-          issuer: 'https://dev-51450276.okta.com/oauth2/default',
-          clientId: '0oanju856m44Sbyx65d7',
-          redirectUri: 'http://localhost:4200/login/callback',
-          scopes: ['openid', 'profile', 'email'],
-        }),
-      })
-    ),
-    provideHttpClient(),
+    importProvidersFrom(OktaAuthModule),
+    provideHttpClient(withFetch()),
     ProductService,
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideClientHydration(withEventReplay()),
+    { provide: OKTA_CONFIG, useValue: { oktaAuth } },
   ],
 };
