@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { map, Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 import { Product } from '../common/product';
 import { ProductCategory } from '../common/product-category';
 
@@ -8,14 +9,16 @@ import { ProductCategory } from '../common/product-category';
   providedIn: 'root',
 })
 export class ProductService {
-  private baseUrl = 'http://localhost:8080/api/products';
-  private categoryURL = 'http://localhost:8080/api/product-category';
+  private baseUrl = `${environment.backendURL}/products`;
+  private categoryURL = `${environment.backendURL}/product-category`;
 
   constructor(private httpClient: HttpClient) {}
 
   getProductList(_currentCategoryId: number): Observable<Product[]> {
     // Need to build URL based on category Id.
     const searchURL = `${this.baseUrl}/search/findByCategoryId?id=${_currentCategoryId}`;
+    console.log(searchURL);
+    
     return this.getProducts(searchURL);
   }
 

@@ -1,5 +1,5 @@
-import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { Component, Inject, PLATFORM_ID } from '@angular/core';
 import {
   FormBuilder,
   FormControl,
@@ -8,10 +8,12 @@ import {
   Validators,
 } from '@angular/forms';
 import { Router } from '@angular/router';
+import { environment } from '../../../environments/environment';
 import { Country } from '../../common/country';
 import { CustomValidators } from '../../common/custom-validators';
 import { Order } from '../../common/order';
 import { OrderItem } from '../../common/order-item';
+import { PaymentInfo } from '../../common/payment-info';
 import { Purchase } from '../../common/purchase';
 import { State } from '../../common/state';
 import { CartService } from '../../services/cart.service';
@@ -31,19 +33,39 @@ export class CheckoutComponent {
   creditCardYears: number[] = [];
   creditCardMonths: number[] = [];
   countries: Country[] = [];
-
+  storage: Storage | null = null;
   shippingAddressStates: State[] = [];
   billingAddressStates: State[] = [];
+  loggedInEmail: string = '';
+
+  //Initialize the stripe API
+
+  stripe = Stripe(environment.publishableKey);
+
+  paymentInfo: PaymentInfo = new PaymentInfo();
+  cardElement: any;
+  displayError: any;
+
+  //Disable payment button from being hit multiple times
+
+  isDisabled: boolean = false;
 
   constructor(
     private formBuilder: FormBuilder,
     private cartService: CartService,
     private formService: FormService,
     private checkOutService: CheckOutService,
-    private router: Router
+    private router: Router,
+    @Inject(PLATFORM_ID) private platformId: Object
   ) {}
 
   ngOnInit(): void {
+    if (isPlatformBrowser(this.platformId)) {
+      this.storage = sessionStorage;
+      this.loggedInEmail = JSON.parse(sessionStorage.getItem('userEmail')!);
+    }
+
+    this.setupStripePaymentForm();
     this.checkOutFromGroup = this.formBuilder.group({
       customer: this.formBuilder.group({
         firstName: new FormControl('', [
@@ -56,7 +78,7 @@ export class CheckoutComponent {
           Validators.minLength(2),
           CustomValidators.notOnlyWhitespace,
         ]),
-        email: new FormControl('', [
+        email: new FormControl(this.loggedInEmail, [
           Validators.required,
           Validators.pattern('^[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,4}$'),
           CustomValidators.notOnlyWhitespace,
@@ -112,39 +134,66 @@ export class CheckoutComponent {
       }),
 
       creditCard: this.formBuilder.group({
-        cardType: new FormControl('', [Validators.required]),
-        nameOnCard: new FormControl('', [
-          Validators.required,
-          Validators.minLength(2),
-          CustomValidators.notOnlyWhitespace,
-        ]),
-        cardNumber: new FormControl('', [
-          Validators.required,
-          Validators.pattern('[0-9]{16}'),
-        ]),
-        securityCode: new FormControl('', [
-          Validators.required,
-          Validators.pattern('[0-9]{3}'),
-        ]),
-        expirationMonth: [''],
-        expirationYear: [''],
+        // cardType: new FormControl('', [Validators.required]),
+        // nameOnCard: new FormControl('', [
+        //   Validators.required,
+        //   Validators.minLength(2),
+        //   CustomValidators.notOnlyWhitespace,
+        // ]),
+        // cardNumber: new FormControl('', [
+        //   Validators.required,
+        //   Validators.pattern('[0-9]{16}'),
+        // ]),
+        // securityCode: new FormControl('', [
+        //   Validators.required,
+        //   Validators.pattern('[0-9]{3}'),
+        // ]),
+        // expirationMonth: [''],
+        // expirationYear: [''],
       }),
     });
 
     const startMonth: number = new Date().getMonth() + 1;
 
-    this.formService.getCreditCardMonths().subscribe((data) => {
-      this.creditCardMonths = data;
-    });
+    // this.formService.getCreditCardMonths().subscribe((data) => {
+    //   this.creditCardMonths = data;
+    // });
 
-    this.formService.getCreditCardYears().subscribe((data) => {
-      this.creditCardYears = data;
-    });
+    // this.formService.getCreditCardYears().subscribe((data) => {
+    //   this.creditCardYears = data;
+    // });
 
     this.getCartTotals();
 
     this.formService.getCountries().subscribe((data) => {
       this.countries = data;
+    });
+  }
+
+  setupStripePaymentForm() {
+    // get a handle to stripe elements
+
+    var elements = this.stripe.elements()
+
+    //Create a card element   and hide the zip code field.
+
+    this.cardElement = elements.create('card', { hidePostalCode: true });
+
+    // Add an instance of card UI component into the 'card-element' div
+    this.cardElement.mount('#card-element');
+
+    // Add and event binding for the change event on the card element.
+    this.cardElement.on('change', (event: any) => {
+      //Get a handle to card errors element
+      this.displayError = document.getElementById('card-errors');
+
+      if (event.complete) {
+        this.displayError.textContent = '';
+      } else if (event.error) {
+        //Show validation error to customer
+
+        this.displayError.textContent = event.error.message;
+      }
     });
   }
 
@@ -223,41 +272,91 @@ export class CheckoutComponent {
     purchase.order = order;
     purchase.orderItems = orderItems;
 
-    //Call rest api via checkout service
+    //Compute  payment info
 
-    this.checkOutService.placeOrder(purchase).subscribe({
-      next: (response) => {
-        alert(
-          `Your order has been received.\nOrder tracking number: ${response.orderTrackingNumber}`
-        );
+    this.paymentInfo.amount = Math.round(this.totalPrice * 100);
+    this.paymentInfo.currency = 'USD';
+    this.paymentInfo.receiptEmail = purchase.customer.email;
+    
+    //Call backend for payment-intent and then to checkout service.
 
-        //reset cart.
+    // if form is valid then
+    // - create payment intent
+    // - confirm card payment
+    // - place order
 
-        this.resetCart();
-      },
-      error: (err) => {
-        alert(`There was an error: ${err.message}`);
-      },
-    });
+    
+    if (
+      !this.checkOutFromGroup.invalid &&
+      this.displayError.textContent === ''
+    ) {
+
+      this.isDisabled = true;
+      this.checkOutService
+        .getPaymentIntent(this.paymentInfo)
+        .subscribe((paymentIntentResponse) => {
+          this.stripe
+            .confirmCardPayment(
+              paymentIntentResponse.client_secret,
+              {
+                payment_method: {
+                  card: this.cardElement,
+                  billing_details: {
+                    email: purchase.customer.email,
+                    name: `${purchase.customer.firstName} ${purchase.customer.lastName}`,
+                    address: {
+                      line1: purchase.billingAddress.street,
+                      city: purchase.billingAddress.city,
+                      state: purchase.billingAddress.state,
+                      postal_code: purchase.billingAddress.zipCode,
+                      country: this.billingAddressCountry?.value.code,
+                    }
+                  }
+                },
+              },
+              { handleActions: false }
+            )
+            .then((result: any) => {
+              if (result.error) {
+                alert(`There was an error, ${result.error.message}`);
+                this.isDisabled = false
+              } else {
+                this.checkOutService.placeOrder(purchase).subscribe({
+                  next: (response: any) => {
+                    alert(
+                      `Your order has been received.\nOrder tracking number: ${response.orderTrackingNumber}`
+                    );
+                    this.resetCart();
+                    this.isDisabled = false;
+                  },
+                  error: (err: any) => {
+                    alert(`There was an error: ${err.message}`);
+                    this.isDisabled = false;
+                  },
+                });
+              }
+            });
+        });
+    } else {
+      this.checkOutFromGroup.markAllAsTouched();
+      return;
+    }
   }
 
-
   resetCart() {
-
     //Reset Cart data
 
-    this.cartService.cartItems = []
-    this.cartService.totalPrice.next(0)
-    this.cartService.totalQuantity.next(0)
-
+    this.cartService.cartItems = [];
+    this.cartService.totalPrice.next(0);
+    this.cartService.totalQuantity.next(0);
+    this.cartService.persistCartData();
     this.checkOutFromGroup.reset();
 
-    this.router.navigateByUrl("/product")
+    this.router.navigateByUrl('/product');
 
     //Reset form data
 
     //Navigate back to main products page
-
   }
 
   copyShippingAddressToBilling(event: Event) {

@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { map, Observable, of } from 'rxjs';
+import { environment } from '../../environments/environment';
 import { Country } from '../common/country';
 import { State } from '../common/state';
 
@@ -8,7 +9,7 @@ import { State } from '../common/state';
   providedIn: 'root',
 })
 export class FormService {
-  private countriesURL = 'http://localhost:8080/api/countries';
+  private countriesURL = `${environment.backendURL}/countries`;
 
   constructor(private httpClient: HttpClient) {}
 
@@ -42,7 +43,7 @@ export class FormService {
   }
 
   getStates(countryCode: string): Observable<State[]> {
-    const stateURL = `http://localhost:8080/api/states/search/findByCountryCode?code=${countryCode}`;
+    const stateURL = `${environment.backendURL}/states/search/findByCountryCode?code=${countryCode}`;
     return this.httpClient
       .get<GetResponseStates>(stateURL)
       .pipe(map((response) => response._embedded.states));

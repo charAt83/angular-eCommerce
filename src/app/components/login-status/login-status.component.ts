@@ -1,5 +1,5 @@
-import { CommonModule } from '@angular/common';
-import { Component, Inject } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { Component, Inject, PLATFORM_ID } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { OKTA_AUTH, OktaAuthStateService } from '@okta/okta-angular';
 import { OktaAuth } from '@okta/okta-auth-js';
@@ -13,10 +13,13 @@ import { OktaAuth } from '@okta/okta-auth-js';
 export class LoginStatusComponent {
   isAuthenticated: boolean = false;
   userFullName: string = '';
+  userEmail: string = '';
+  storage: Storage | null = null;
 
   constructor(
     private oktaAuthService: OktaAuthStateService,
-    @Inject(OKTA_AUTH) private oktaAuth: OktaAuth
+    @Inject(OKTA_AUTH) private oktaAuth: OktaAuth,
+    @Inject(PLATFORM_ID) private platformId: Object
   ) {}
 
   ngOnInit(): void {
@@ -29,6 +32,12 @@ export class LoginStatusComponent {
     if (this.isAuthenticated) {
       this.oktaAuth.getUser().then((res) => {
         this.userFullName = res.name as string;
+        this.userEmail = res.email as string;
+        if (isPlatformBrowser(this.platformId)) {
+          this.storage = sessionStorage;
+          const email = res.email;
+          this.storage.setItem('userEmail', JSON.stringify(email));
+        }
       });
     }
   }
